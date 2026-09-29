@@ -1,0 +1,38 @@
+name: asset-proxy
+
+services:
+  origin:
+    build: .
+    command: ["/app/origin"]
+    environment:
+      PORT: "9000"
+    expose:
+      - "9000"
+
+  proxy:
+    build: .
+    command: ["/app/proxy"]
+    environment:
+      PORT: "8080"
+      ORIGIN_URL: "http://origin:9000"
+      # Shortened so the verify suite can exercise the stale window quickly.
+      # Production default is 30s (see cmd/proxy and the unit tests).
+      STALE_IF_ERROR: "3s"
+      FETCH_TIMEOUT: "5s"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - origin
+
+  # One-shot acceptance suite: runs the full end-to-end checks against the
+  # live proxy + origin and exits 0 on success.
+  verify:
+    build: .
+    command: ["/app/verify"]
+    environment:
+      PROXY_URL: "http://proxy:8080"
+      ORIGIN_URL: "http://origin:9000"
+    depends_on:
+      - proxy
+      - origin
+    restart: "no"
